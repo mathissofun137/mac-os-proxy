@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scramjet Browser</title>
+    <link rel="icon" href="/assets/img/fav.png" />
+    <style>
+      :root {
+        --bg: #090014;
+        --bg-strong: #12001f;
+        --panel: rgba(20, 12, 32, 0.86);
+        --panel-strong: rgba(31, 17, 42, 0.96);
+        --modal: rgba(16, 10, 24, 0.9);
+        --purple: #8803fc;
+        --purple-bright: #a855f7;
+        --purple-soft: #c084fc;
+        --purple-glow: rgba(168, 85, 247, 0.44);
+        --border: rgba(192, 132, 252, 0.28);
+        --text: #f6ecff;
+        --muted: #bbaed0;
+        --muted-strong: #9e8bb7;
+        --shadow: rgba(4, 1, 12, 0.72);
+        --success: #66f0d8;
+        --warning: #ffb857;
+        --danger: #ff6b9d;
+        --chrome-height: 78px;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        min-height: 100vh;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at top left, rgba(147, 51, 234, 0.28), transparent 28%),
+          radial-gradient(circle at top right, rgba(168, 85, 247, 0.20), transparent 30%),
+          linear-gradient(180deg, var(--bg), #0c0017 48%, #0a0515 100%);
+        color: var(--text);
+        font-family: Inter, "Segoe UI", sans-serif;
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        background-image: radial-gradient(rgba(255,255,255,0.08) 0.8px, transparent 0.8px);
+        background-size: 18px 18px;
+        opacity: 0.12;
+        pointer-events: none;
+      }
+
+      body.particles-off::before { display: none; }
+      body.reduced-motion * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+
+      button, input, select {
+        font: inherit;
+      }
+
+      .app-shell {
+        position: relative;
+        width: 100%;
+        height: 100vh;
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        padding: 18px;
+      }
+
+      .browser-window {
+        position: relative;
+        width: min(1420px, 100%);
+        height: 100%;
+        background: rgba(13, 9, 23, 0.78);
+        border: 1px solid var(--border);
+        border-radius: 26px;
+        overflow: hidden;
+        box-shadow: 0 28px 90px var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .toolbar {
+        position: relative;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        height: var(--chrome-height);
+        padding: 12px 14px 10px;
+        background: linear-gradient(180deg, rgba(18, 12, 30, 0.96), rgba(14, 9, 23, 0.84));
+        border-bottom: 1px solid rgba(192, 132, 252, 0.1);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+      }
+
+      .traffic {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 84px;
+        flex-shrink: 0;
+      }
+
+      .traffic-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        box-shadow: 0 0 12px rgba(255,255,255,0.25);
+      }
+
+      .traffic-dot.red { background: #ff6b6b; }
+      .traffic-dot.yellow { background: #ffd166; }
+      .traffic-dot.green { background: #69e38a; }
+
+      .tab-strip {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 480px;
+        overflow: hidden;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .tab-button {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        max-width: 200px;
+        min-width: 120px;
+        height: 38px;
+        border-radius: 12px;
+        border: 1px solid rgba(192, 132, 252, 0.13);
+        background: rgba(255,255,255,0.02);
+        color: var(--muted);
+        padding: 0 12px;
+        transition: 0.2s ease;
+        cursor: pointer;
+      }
+
+      .tab-button span:first-child {
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        flex: 1;
+      }
+
+      .tab-button.active {
+        background: linear-gradient(180deg, rgba(136, 3, 252, 0.24), rgba(168, 85, 247, 0.08));
+        border-color: rgba(168, 85, 247, 0.36);
+        color: var(--text);
+        box-shadow: inset 0 0 18px rgba(136, 3, 252, 0.18), 0 0 18px rgba(168, 85, 247, 0.15);
+      }
+
+      .tab-button:hover {
+        border-color: rgba(168, 85, 247, 0.26);
+      }
+
+      .tab-close {
+        color: var(--muted-strong);
+        font-size: 18px;
+        line-height: 1;
+        padding-left: 4px;
+      }
+
+      .new-tab-btn {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        border: 1px solid rgba(192, 132, 252, 0.18);
+        background: rgba(255,255,255,0.02);
+        color: var(--text);
+        cursor: pointer;
+        font-size: 26px;
+        line-height: 1;
+      }
+
+      .toolbar-tools {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 8px;
+        min-width: 420px;
+      }
+
+      .icon-button {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        border: 1px solid rgba(192, 132, 252, 0.16);
+        background: rgba(255,255,255,0.02);
+        color: var(--text);
+        cursor: pointer;
+        transition: 0.2s ease;
+      }
+
+      .icon-button:hover {
+        border-color: rgba(168, 85, 247, 0.32);
+        background: rgba(168, 85, 247, 0.12);
+        box-shadow: 0 0 18px rgba(168, 85, 247, 0.18);
+      }
+
+      .address-shell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex: 1;
+        max-width: 850px;
+        min-width: 280px;
+        height: 42px;
+        padding: 0 10px 0 12px;
+        border: 1px solid rgba(168, 85, 247, 0.2);
+        border-radius: 14px;
+        background: rgba(14, 10, 26, 0.74);
+        box-shadow: inset 0 0 18px rgba(168,85,247,0.05);
+      }
+
+      .address-shell .lock {
+        font-size: 14px;
+        color: var(--muted);
+      }
+
+      .address-input {
+        flex: 1;
+        min-width: 0;
+        border: none;
+        background: transparent;
+        color: var(--text);
+        font-size: 14px;
+        outline: none;
+      }
+
+      .address-input::placeholder { color: var(--muted-strong); }
+
+      .go-button {
+        height: 30px;
+        padding: 0 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(168, 85, 247, 0.22);
+        background: linear-gradient(180deg, rgba(136,3,252,0.36), rgba(168,85,247,0.2));
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .loading-bar {
+        position: relative;
+        height: 3px;
+        background: rgba(168, 85, 247, 0.08);
+        overflow: hidden;
+      }
+
+      #loadingIndicator {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 30%;
+        background: linear-gradient(90deg, #a855f7, #c084fc, #d8b4fe);
+        box-shadow: 0 0 12px rgba(168, 85, 247, 0.8);
+        border-radius: 0 999px 999px 0;
+        opacity: 0;
+        transition: width 0.25s ease, opacity 0.15s ease;
+      }
+
+      .viewport {
+        position: relative;
+        width: 100%;
+        height: calc(100% - var(--chrome-height) - 3px);
+        background: rgba(8, 3, 16, 0.9);
+      }
+
+      .browser-frame {
+        position: absolute;
+        inset: 14px;
+        width: calc(100% - 28px);
+        height: calc(100% - 28px);
+        border: 1px solid rgba(192, 132, 252, 0.18);
+        border-radius: 20px;
+        background: rgba(255,255,255,0.04);
+      }
+
+      .browser-frame.hidden,
+      .home-view.hidden,
+      .error-view.hidden,
+      .settings-panel.hidden { display: none; }
+
+      .home-view {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(168,85,247,0.25), transparent 22%),
+          radial-gradient(circle at 70% 30%, rgba(192,132,252,0.22), transparent 20%),
+          linear-gradient(180deg, rgba(11, 8, 20, 0.65), rgba(10, 6, 20, 0.9));
+      }
+
+      .home-view::before,
+      .home-view::after {
+        content: "";
+        position: absolute;
+        width: 38rem;
+        height: 38rem;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(168,85,247,0.3), transparent 62%);
+        filter: blur(30px);
+        animation: floatGlow 9s ease-in-out infinite alternate;
+      }
+
+      .home-view::before { left: -8rem; top: -10rem; }
+      .home-view::after { right: -8rem; bottom: -12rem; animation-delay: 1.5s; }
+
+      @keyframes floatGlow {
+        0% { transform: translate(0, 0) scale(1); }
+        100% { transform: translate(0, 18px) scale(1.08); }
+      }
+
+      .home-card {
+        position: relative;
+        z-index: 1;
+        width: min(760px, 86vw);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 26px;
+        text-align: center;
+      }
+
+      .brand {
+        font-size: clamp(2.5rem, 4vw, 4.7rem);
+        letter-spacing: -0.08em;
+        font-weight: 700;
+        margin: 0;
+        background: linear-gradient(180deg, #ffffff, #d8b4fe 46%, #a855f7 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      .home-search {
+        width: min(720px, 100%);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 12px 10px 18px;
+        border-radius: 20px;
+        background: rgba(18, 12, 31, 0.9);
+        border: 1px solid rgba(168,85,247,0.26);
+        box-shadow: 0 0 0 1px rgba(255,255,255,0.02), 0 20px 50px rgba(168,85,247,0.18);
+      }
+
+      .home-search input {
+        flex: 1;
+        min-width: 0;
+        border: none;
+        background: transparent;
+        color: var(--text);
+        font-size: 1.05rem;
+        outline: none;
+      }
+
+      .home-search input::placeholder { color: var(--muted-strong); }
+
+      .home-search button {
+        height: 38px;
+        padding: 0 18px;
+        border: none;
+        border-radius: 12px;
+        background: linear-gradient(180deg, #a855f7, #7e22ce);
+        color: var(--text);
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      .home-grid {
+        width: min(730px, 100%);
+        display: grid;
+        grid-template-columns: repeat(4, minmax(90px, 1fr));
+        gap: 14px;
+      }
+
+      .site-tile {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 16px 10px;
+        border-radius: 16px;
+        border: 1px solid rgba(192, 132, 252, 0.17);
+        background: rgba(255,255,255,0.02);
+        color: var(--text);
+        cursor: pointer;
+        transition: 0.2s ease;
+      }
+
+      .site-tile:hover {
+        transform: translateY(-2px);
+        background: rgba(168,85,247,0.1);
+        border-color: rgba(168,85,247,0.28);
+        box-shadow: 0 0 18px rgba(168,85,247,0.15);
+      }
+
+      .site-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+        background: linear-gradient(180deg, rgba(168,85,247,0.35), rgba(136,3,252,0.25));
+        color: #fff;
+      }
+
+      .site-name {
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+
+      .recent-panel {
+        width: min(780px, 86vw);
+        margin-top: 8px;
+        padding: 18px 18px 10px;
+        border: 1px solid rgba(192, 132, 252, 0.14);
+        border-radius: 18px;
+        background: rgba(17, 11, 27, 0.62);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+      }
+
+      .recent-panel h3 {
+        margin: 0 0 12px;
+        font-size: 0.82rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted-strong);
+      }
+
+      .recent-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .recent-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px 6px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(192, 132, 252, 0.14);
+        background: rgba(255,255,255,0.02);
+      }
+
+      .recent-site {
+        border: none;
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+      }
+
+      .recent-remove {
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: none;
+        background: rgba(255,255,255,0.04);
+        color: var(--muted);
+        cursor: pointer;
+      }
+
+      .empty-state {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .error-view {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(180deg, rgba(13, 9, 20, 0.9), rgba(12, 8, 19, 0.98));
+      }
+
+      .error-card {
+        width: min(520px, 82vw);
+        padding: 28px 24px;
+        border-radius: 22px;
+        background: rgba(18, 12, 30, 0.9);
+        border: 1px solid rgba(168,85,247,0.2);
+        box-shadow: 0 18px 34px rgba(10, 5, 18, 0.5);
+      }
+
+      .error-icon {
+        width: 64px;
+        height: 64px;
+        display: grid;
+        place-items: center;
+        border-radius: 18px;
+        margin-bottom: 16px;
+        background: linear-gradient(180deg, rgba(255,107,157,0.24), rgba(136,3,252,0.2));
+        color: #ffd0df;
+        font-size: 2rem;
+      }
+
+      .error-card h2 {
+        margin: 0 0 10px;
+        font-size: clamp(1.7rem, 2vw, 2.3rem);
+      }
+
+      .error-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      .error-actions {
+        margin-top: 22px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .primary-button,
+      .secondary-button {
+        border-radius: 12px;
+        padding: 11px 16px;
+        border: 1px solid rgba(168,85,247,0.2);
+        cursor: pointer;
+      }
+
+      .primary-button {
+        background: linear-gradient(180deg, #a855f7, #7e22ce);
+        color: var(--text);
+      }
+
+      .secondary-button {
+        background: rgba(255,255,255,0.02);
+        color: var(--text);
+      }
+
+      details {
+        margin-top: 18px;
+        border-top: 1px solid rgba(192,132,252,0.12);
+        padding-top: 12px;
+      }
+
+      summary {
+        cursor: pointer;
+        color: var(--muted);
+      }
+
+      #errorDetails {
+        margin-top: 8px;
+        padding: 10px 12px;
+        background: rgba(255,255,255,0.02);
+        border-radius: 10px;
+        color: var(--muted);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .settings-panel {
+        position: absolute;
+        right: 20px;
+        top: 88px;
+        width: min(360px, calc(100% - 28px));
+        padding: 18px 18px 12px;
+        border-radius: 18px;
+        border: 1px solid rgba(192,132,252,0.16);
+        background: rgba(18, 12, 30, 0.96);
+        box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+        z-index: 40;
+      }
+
+      .settings-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+
+      .settings-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+
+      .close-settings {
+        border: none;
+        background: transparent;
+        color: var(--muted);
+        font-size: 1.2rem;
+        cursor: pointer;
+      }
+
+      .settings-grid {
+        display: grid;
+        gap: 14px;
+      }
+
+      .settings-item {
+        display: grid;
+        gap: 8px;
+      }
+
+      .settings-item label {
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted-strong);
+      }
+
+      .settings-item select,
+      .settings-item input[type="checkbox"] {
+        accent-color: var(--purple);
+      }
+
+      .settings-item select {
+        width: 100%;
+        border: 1px solid rgba(192,132,252,0.18);
+        background: rgba(255,255,255,0.03);
+        color: var(--text);
+        border-radius: 10px;
+        height: 38px;
+        padding: 0 12px;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.02);
+      }
+
+      .toggle-row span {
+        color: var(--muted);
+      }
+
+      .settings-footer {
+        margin-top: 18px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .settings-footer button {
+        flex: 1;
+        border: 1px solid rgba(168,85,247,0.2);
+        background: rgba(255,255,255,0.02);
+        color: var(--text);
+        border-radius: 12px;
+        height: 36px;
+        cursor: pointer;
+      }
+
+      @media (max-width: 920px) {
+        .toolbar { gap: 10px; }
+        .tab-strip { max-width: 240px; }
+        .toolbar-tools { min-width: 200px; }
+        .address-shell { max-width: 420px; }
+      }
+
+      @media (max-width: 700px) {
+        .app-shell { padding: 10px; }
+        .browser-window { border-radius: 18px; }
+        .toolbar { padding: 8px 10px; }
+        .traffic { width: 62px; }
+        .toolbar-tools { min-width: auto; gap: 6px; }
+        .tab-strip { max-width: 170px; }
+        .tab-button { min-width: 84px; max-width: 140px; }
+        .address-shell { min-width: 0; }
+        .home-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+        .browser-frame { inset: 10px; width: calc(100% - 20px); height: calc(100% - 20px); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="browser-window">
+        <header class="toolbar">
+          <div class="traffic" aria-label="window controls">
+            <span class="traffic-dot red"></span>
+            <span class="traffic-dot yellow"></span>
+            <span class="traffic-dot green"></span>
+          </div>
+
+          <div id="tabStrip" class="tab-strip" aria-label="Tabs">
+            <button id="newTabButton" class="new-tab-btn" type="button" aria-label="New tab">+</button>
+          </div>
+
+          <div class="toolbar-tools">
+            <button id="backButton" class="icon-button" aria-label="Back">←</button>
+            <button id="forwardButton" class="icon-button" aria-label="Forward">→</button>
+            <button id="reloadButton" class="icon-button" aria-label="Reload">↻</button>
+            <button id="homeButton" class="icon-button" aria-label="Home">⌂</button>
+
+            <div class="address-shell">
+              <span class="lock">🔒</span>
+              <input id="addressInput" class="address-input" type="text" placeholder="Search or enter a URL" aria-label="Address bar" />
+              <button id="goButton" class="go-button" type="button">Go</button>
+            </div>
+
+            <button id="settingsButton" class="icon-button" aria-label="Settings">⚙</button>
+            <button id="fullscreenButton" class="icon-button" aria-label="Fullscreen">⤢</button>
+          </div>
+        </header>
+
+        <div class="loading-bar" aria-live="polite">
+          <span id="loadingIndicator"></span>
+        </div>
+
+        <main class="viewport">
+          <iframe id="browserFrame" class="browser-frame" title="Scramjet Browser" allow="fullscreen; autoplay; clipboard-read; clipboard-write"></iframe>
+
+          <section id="homeView" class="home-view">
+            <div class="home-card">
+              <h1 class="brand">scramjet</h1>
+
+              <div class="home-search">
+                <input id="homeSearchInput" type="text" placeholder="Search the web or enter a URL" aria-label="Search" />
+                <button id="homeSearchButton" type="button">Search</button>
+              </div>
+
+              <div id="quickSites" class="home-grid" aria-label="Quick access sites">
+                <button class="site-tile" type="button" data-site="https://google.com"><span class="site-icon">G</span><span class="site-name">Google</span></button>
+                <button class="site-tile" type="button" data-site="https://youtube.com"><span class="site-icon">Y</span><span class="site-name">YouTube</span></button>
+                <button class="site-tile" type="button" data-site="https://example.com"><span class="site-icon">E</span><span class="site-name">Example</span></button>
+                <button class="site-tile" type="button" data-site="https://github.com"><span class="site-icon">GH</span><span class="site-name">GitHub</span></button>
+              </div>
+            </div>
+
+            <div class="recent-panel">
+              <h3>Recent</h3>
+              <div id="recentSites" class="recent-list"></div>
+            </div>
+          </section>
+
+          <section id="errorView" class="error-view hidden" aria-live="polite">
+            <div class="error-card">
+              <div class="error-icon">!</div>
+              <h2>Unable to load this page.</h2>
+              <p>The browser could not reach this destination through Scramjet.</p>
+
+              <div class="error-actions">
+                <button id="errorRetry" class="primary-button" type="button">Retry</button>
+                <button id="errorHome" class="secondary-button" type="button">Return Home</button>
+              </div>
+
+              <details>
+                <summary>Technical details</summary>
+                <pre id="errorDetails">Unable to load this page.</pre>
+              </details>
+            </div>
+          </section>
+        </main>
+      </div>
+
+      <aside id="settingsPanel" class="settings-panel hidden" aria-label="Settings panel">
+        <div class="settings-header">
+          <h3>Settings</h3>
+          <button id="closeSettings" class="close-settings" type="button" aria-label="Close settings">×</button>
+        </div>
+
+        <div class="settings-grid">
+          <div class="settings-item">
+            <label for="searchEngineSelect">Search engine</label>
+            <select id="searchEngineSelect">
+              <option value="DuckDuckGo">DuckDuckGo</option>
+              <option value="Google">Google</option>
+              <option value="Bing">Bing</option>
+              <option value="Startpage">Startpage</option>
+              <option value="Qwant">Qwant</option>
+              <option value="Brave">Brave</option>
+            </select>
+          </div>
+
+          <div class="settings-item">
+            <label for="homepageSelect">Homepage</label>
+            <select id="homepageSelect">
+              <option value="home">Home</option>
+              <option value="newtab">New tab</option>
+            </select>
+          </div>
+
+          <div class="settings-item">
+            <label for="themeIntensitySelect">Theme intensity</label>
+            <select id="themeIntensitySelect">
+              <option value="low">Low</option>
+              <option value="balanced" selected>Balanced</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+
+          <div class="toggle-row">
+            <span>Animations</span>
+            <input id="animationsToggle" type="checkbox" checked />
+          </div>
+
+          <div class="toggle-row">
+            <span>Particles</span>
+            <input id="particlesToggle" type="checkbox" checked />
+          </div>
+        </div>
+
+        <div class="settings-footer">
+          <button id="aboutButton" type="button">About</button>
+          <button id="clearDataButton" type="button">Clear browsing data</button>
+        </div>
+        <div id="aboutPanel" class="settings-item" style="display:none; margin-top:14px;">
+          <label>About Scramjet Browser</label>
+          <div style="padding:12px 10px; border-radius:10px; background: rgba(255,255,255,0.02); color: var(--muted); line-height:1.6;">
+            Futuristic purple browser UI powered by the Scramjet proxy stack. It keeps browsing sessions in separate tabs and stores searches locally for quick repeated access.
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <script src="/baremux/index.js"></script>
+    <script src="/homework/math.all.js"></script>
+    <script src="/assets/js/browserfunctions.js"></script>
+  </body>
+</html>
